@@ -424,7 +424,8 @@
           <div class="panel-rows" id="helix-today-rows"></div>
           <div class="co2" id="helix-today-co2">
             <span><span class="amt">0 g</span> CO₂ <span class="cmp"></span></span>
-            <a href="https://www.wren.co/subscribe" target="_blank" rel="noopener">Offset →</a>
+            <a href="https://arxiv.org/abs/2311.16863" target="_blank" rel="noopener"
+               title="'Power Hungry Processing: Watts Driving the Cost of AI Deployment' — Luccioni, Jernite, Strubell (2023). Peer-reviewed per-inference emissions research our estimates are calibrated against.">Source →</a>
           </div>
         </div>
 
