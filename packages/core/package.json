@@ -1,0 +1,51 @@
+{
+  "name": "helix-tokens",
+  "version": "0.1.0",
+  "description": "Count tokens and estimate cost for every major LLM. No API keys. Works offline.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "development": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsup src/index.ts --format esm --dts --clean",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "keywords": [
+    "llm",
+    "tokens",
+    "tokenizer",
+    "openai",
+    "anthropic",
+    "claude",
+    "gpt",
+    "gemini",
+    "llama",
+    "cost",
+    "pricing"
+  ],
+  "license": "MIT",
+  "author": "Swanand",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/swanand/helix.git",
+    "directory": "packages/core"
+  },
+  "homepage": "https://github.com/swanand/helix#readme",
+  "bugs": "https://github.com/swanand/helix/issues",
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@helix-tokens/prices": "workspace:*",
+    "js-tiktoken": "^1.0.15"
+  }
+}

@@ -1,0 +1,121 @@
+{
+  "version": "2026.7.18",
+  "updated": "2026-07-18T12:00:00Z",
+  "currency": "USD",
+  "unit": "per 1M tokens",
+  "models": {
+    "gpt-4o": {
+      "provider": "openai",
+      "family": "gpt-4o",
+      "context": 200000,
+      "input": 2.5,
+      "output": 10.0,
+      "cachedInput": 1.25
+    },
+    "gpt-4o-mini": {
+      "provider": "openai",
+      "family": "gpt-4o",
+      "context": 128000,
+      "input": 0.15,
+      "output": 0.6,
+      "cachedInput": 0.075
+    },
+    "gpt-4-turbo": {
+      "provider": "openai",
+      "family": "gpt-4",
+      "context": 128000,
+      "input": 10.0,
+      "output": 30.0
+    },
+    "o3": {
+      "provider": "openai",
+      "family": "o",
+      "context": 200000,
+      "input": 10.0,
+      "output": 40.0,
+      "cachedInput": 5.0
+    },
+    "o3-mini": {
+      "provider": "openai",
+      "family": "o",
+      "context": 200000,
+      "input": 1.1,
+      "output": 4.4,
+      "cachedInput": 0.55
+    },
+    "claude-4.5-opus": {
+      "provider": "anthropic",
+      "family": "claude-4.5",
+      "context": 200000,
+      "input": 15.0,
+      "output": 75.0,
+      "cachedInput": 1.5
+    },
+    "claude-4.5-sonnet": {
+      "provider": "anthropic",
+      "family": "claude-4.5",
+      "context": 200000,
+      "input": 3.0,
+      "output": 15.0,
+      "cachedInput": 0.3
+    },
+    "claude-4.5-haiku": {
+      "provider": "anthropic",
+      "family": "claude-4.5",
+      "context": 200000,
+      "input": 1.0,
+      "output": 5.0,
+      "cachedInput": 0.1
+    },
+    "gemini-2.5-pro": {
+      "provider": "google",
+      "family": "gemini-2.5",
+      "context": 2000000,
+      "input": 1.25,
+      "output": 5.0
+    },
+    "gemini-2.5-flash": {
+      "provider": "google",
+      "family": "gemini-2.5",
+      "context": 1000000,
+      "input": 0.1,
+      "output": 0.4
+    },
+    "llama-3.3-70b": {
+      "provider": "meta",
+      "family": "llama-3.3",
+      "context": 128000,
+      "input": 0.0,
+      "output": 0.0
+    },
+    "llama-3.3-8b": {
+      "provider": "meta",
+      "family": "llama-3.3",
+      "context": 128000,
+      "input": 0.0,
+      "output": 0.0
+    },
+    "mistral-large": {
+      "provider": "mistral",
+      "family": "mistral",
+      "context": 128000,
+      "input": 2.0,
+      "output": 6.0
+    },
+    "mistral-small": {
+      "provider": "mistral",
+      "family": "mistral",
+      "context": 128000,
+      "input": 0.2,
+      "output": 0.6
+    },
+    "deepseek-v3": {
+      "provider": "deepseek",
+      "family": "deepseek",
+      "context": 64000,
+      "input": 0.27,
+      "output": 1.1,
+      "cachedInput": 0.07
+    }
+  }
+}

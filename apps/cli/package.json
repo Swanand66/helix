@@ -1,0 +1,27 @@
+{
+  "name": "helix-tokens-cli",
+  "version": "0.1.0",
+  "private": true,
+  "description": "CLI for helix-tokens: count tokens and estimate cost across every major LLM.",
+  "type": "module",
+  "bin": {
+    "helix-tokens": "./dist/index.js"
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsup",
+    "start": "tsx --conditions=development src/index.ts"
+  },
+  "keywords": ["cli", "llm", "tokens", "cost"],
+  "license": "MIT",
+  "dependencies": {
+    "helix-tokens": "workspace:*",
+    "@helix-tokens/prices": "workspace:*",
+    "kleur": "^4.1.5",
+    "cli-table3": "^0.6.5",
+    "mri": "^1.2.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2"
+  }
+}

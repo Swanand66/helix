@@ -1,0 +1,26 @@
+{
+  "name": "helix-workspace",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Multi-model LLM token counter + cost oracle. No API keys. Works offline.",
+  "type": "module",
+  "packageManager": "pnpm@9.0.0",
+  "scripts": {
+    "build": "pnpm -r run build",
+    "test": "pnpm -r run test",
+    "cli": "pnpm --filter helix-tokens-cli start",
+    "lint": "biome check .",
+    "format": "biome format --write ."
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
+    "typescript": "^5.6.3",
+    "tsup": "^8.3.5",
+    "vitest": "^2.1.4"
+  },
+  "pnpm": {
+    "overrides": {
+      "esbuild": "0.24.2"
+    }
+  }
+}

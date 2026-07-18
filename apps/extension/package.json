@@ -1,0 +1,7 @@
+{
+  "name": "helix-extension",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Browser extension that tracks token usage on chatgpt.com and claude.ai — no build step, plain MV3.",
+  "license": "MIT"
+}

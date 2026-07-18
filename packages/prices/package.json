@@ -1,0 +1,38 @@
+{
+  "name": "@helix-tokens/prices",
+  "version": "2026.7.18",
+  "description": "Auto-updated pricing data for every major LLM. Prices in USD per 1M tokens.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "development": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./data": {
+      "development": "./src/data.ts",
+      "types": "./dist/data.d.ts",
+      "import": "./dist/data.js"
+    }
+  },
+  "files": ["dist", "data"],
+  "scripts": {
+    "build": "tsup src/index.ts src/data.ts --format esm --dts --clean"
+  },
+  "keywords": ["llm", "pricing", "openai", "anthropic", "claude", "gpt", "gemini", "tokens"],
+  "license": "MIT",
+  "author": "Swanand",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/swanand/helix.git",
+    "directory": "packages/prices"
+  },
+  "homepage": "https://github.com/swanand/helix#readme",
+  "bugs": "https://github.com/swanand/helix/issues",
+  "publishConfig": {
+    "access": "public"
+  }
+}
