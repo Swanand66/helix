@@ -16,6 +16,8 @@
   const HOST_ID = "helix-orb-host";
   const GRACE_MS = 900;
   const STORAGE_KEY = "helix.events";
+  const STORAGE_KEY_LIMITS = "helix.limits";
+  const HOUR_MS = 3_600_000;
 
   const CSS = `
     :host { all: initial; }
@@ -278,6 +280,119 @@
       color: var(--panel-fg-dim);
       font-size: 11px;
     }
+
+    /* --- CO₂ line + offset link ----------------------------------------- */
+    .co2 {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      margin-top: 8px;
+      font-size: 11px;
+      color: var(--panel-fg-dim);
+      font-variant-numeric: tabular-nums;
+    }
+    .co2 .amt {
+      color: hsl(140, 60%, 65%);
+      font-weight: 600;
+    }
+    .co2 .cmp { color: var(--panel-fg-dim); font-style: italic; }
+    .co2 a {
+      color: hsl(140, 60%, 65%);
+      text-decoration: none;
+      font-size: 10px;
+      border-bottom: 1px dashed hsla(140, 60%, 65%, 0.4);
+    }
+    .co2 a:hover { color: hsl(140, 80%, 72%); border-bottom-color: hsl(140, 80%, 72%); }
+
+    /* --- Rate-limit meter ------------------------------------------------ */
+    .limit {
+      margin-top: 6px;
+    }
+    .limit .row {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      font-size: 11px;
+      color: var(--panel-fg-dim);
+      font-variant-numeric: tabular-nums;
+      margin-bottom: 3px;
+    }
+    .limit .row.is-warn .used { color: #f59e0b; }
+    .limit .row.is-over .used { color: #ef4444; }
+    .limit .row .used { color: var(--panel-fg); font-weight: 600; }
+    .limit .bar {
+      height: 4px;
+      background: rgba(148, 163, 184, 0.15);
+      border-radius: 2px;
+      overflow: hidden;
+      margin-bottom: 8px;
+    }
+    .limit .bar > span {
+      display: block;
+      height: 100%;
+      background: hsl(190, 90%, 55%);
+      border-radius: 2px;
+      transition: width 220ms ease, background 220ms ease;
+    }
+    .limit .bar.is-warn > span { background: #f59e0b; }
+    .limit .bar.is-over > span { background: #ef4444; }
+    .limit-hint {
+      font-size: 10px;
+      color: var(--panel-fg-dim);
+      font-style: italic;
+      margin-top: 2px;
+    }
+
+    /* --- Settings block -------------------------------------------------- */
+    .settings {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 6px 10px;
+      font-size: 11px;
+      align-items: center;
+      color: var(--panel-fg-dim);
+    }
+    .settings label { padding-left: 2px; }
+    .settings input[type="number"] {
+      width: 68px;
+      padding: 3px 6px;
+      background: rgba(148, 163, 184, 0.08);
+      border: 1px solid rgba(148, 163, 184, 0.2);
+      border-radius: 4px;
+      color: var(--panel-fg);
+      font-family: inherit;
+      font-size: 11px;
+      font-variant-numeric: tabular-nums;
+      text-align: right;
+    }
+    .settings input[type="number"]:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+    .settings small {
+      grid-column: 1 / -1;
+      font-size: 10px;
+      color: var(--panel-fg-dim);
+      font-style: italic;
+      margin-top: -2px;
+    }
+
+    /* --- Collapsible section handle ------------------------------------- */
+    details.panel-section > summary {
+      cursor: pointer;
+      list-style: none;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      user-select: none;
+    }
+    details.panel-section > summary::-webkit-details-marker { display: none; }
+    details.panel-section > summary .caret {
+      color: var(--panel-fg-dim);
+      font-size: 10px;
+      transition: transform 200ms ease;
+    }
+    details.panel-section[open] > summary .caret { transform: rotate(90deg); }
   `;
 
   const LOGO_PATH =
@@ -307,7 +422,12 @@
             <span class="cost" id="helix-today-cost">$0</span>
           </div>
           <div class="panel-rows" id="helix-today-rows"></div>
+          <div class="co2" id="helix-today-co2">
+            <span><span class="amt">0 g</span> CO₂ <span class="cmp"></span></span>
+            <a href="https://cooleffect.org/collections/all" target="_blank" rel="noopener">Offset →</a>
+          </div>
         </div>
+
         <div class="panel-section">
           <div class="panel-label">This month</div>
           <div class="panel-big">
@@ -315,7 +435,41 @@
             <span class="cost" id="helix-month-cost">$0</span>
           </div>
           <div class="panel-rows" id="helix-month-rows"></div>
+          <div class="co2" id="helix-month-co2">
+            <span><span class="amt">0 g</span> CO₂ <span class="cmp"></span></span>
+          </div>
         </div>
+
+        <div class="panel-section" id="helix-limits-section">
+          <div class="panel-label">Rate limits</div>
+          <div class="limit">
+            <div class="row" id="helix-limit-hourly-row">
+              <span>Messages / hour</span>
+              <span><span class="used">0</span> / <span id="helix-limit-hourly-cap">off</span></span>
+            </div>
+            <div class="bar" id="helix-limit-hourly-bar"><span style="width: 0%"></span></div>
+            <div class="row" id="helix-limit-daily-row">
+              <span>Spend today</span>
+              <span><span class="used">$0</span> / <span id="helix-limit-daily-cap">off</span></span>
+            </div>
+            <div class="bar" id="helix-limit-daily-bar"><span style="width: 0%"></span></div>
+            <div class="limit-hint" id="helix-limit-hint"></div>
+          </div>
+        </div>
+
+        <details class="panel-section" id="helix-settings-section">
+          <summary>
+            <span class="panel-label" style="margin-bottom:0">Settings</span>
+            <span class="caret">▸</span>
+          </summary>
+          <div class="settings" style="margin-top:10px">
+            <label for="helix-input-hourly">Max messages / hour</label>
+            <input id="helix-input-hourly" type="number" min="0" step="1" placeholder="off">
+            <label for="helix-input-daily">Max $ / day</label>
+            <input id="helix-input-daily" type="number" min="0" step="0.5" placeholder="off">
+            <small>Set to 0 to disable each cap. Warnings are soft — send button never blocked.</small>
+          </div>
+        </details>
       </div>
 
       <div class="orb" id="helix-orb" title="Helix — click to see usage">
@@ -493,10 +647,11 @@
     function aggregate(events, since) {
       const filtered = events.filter((e) => e.ts >= since);
       const byModel = new Map();
-      let tokens = 0, cost = 0;
+      let tokens = 0, cost = 0, co2 = 0;
       for (const e of filtered) {
         tokens += (e.inTokens ?? 0) + (e.outTokens ?? 0);
         cost += e.totalCost ?? 0;
+        co2 += e.co2g ?? 0;
         const key = e.model || e.rawModel || "unknown";
         const cur = byModel.get(key) ?? { tokens: 0, cost: 0, count: 0 };
         cur.tokens += (e.inTokens ?? 0) + (e.outTokens ?? 0);
@@ -507,7 +662,24 @@
       const rows = [...byModel.entries()]
         .map(([model, v]) => ({ model, ...v }))
         .sort((a, b) => b.tokens - a.tokens);
-      return { count: filtered.length, tokens, cost, rows };
+      return { count: filtered.length, tokens, cost, co2, rows };
+    }
+
+    // Human-readable equivalent for a CO₂ amount in grams. Keeps the number
+    // grounded — 47 g means little unless anchored to a familiar thing.
+    function co2Comparison(g) {
+      if (g < 1)     return "";
+      if (g < 20)    return `≈ ${Math.round(g * 4)}s of a lightbulb`;
+      if (g < 200)   return `≈ ${Math.round(g / 200 * 1000)}m in a car`;
+      if (g < 1000)  return `≈ boiling a kettle ${(g / 50).toFixed(1)}x`;
+      if (g < 5000)  return `≈ ${(g / 1000).toFixed(1)}kg — a burger`;
+      return `≈ ${(g / 1000).toFixed(1)}kg CO₂e`;
+    }
+
+    function fmtCO2(g) {
+      if (g < 1)   return `${g.toFixed(2)} g`;
+      if (g < 1000) return `${Math.round(g)} g`;
+      return `${(g / 1000).toFixed(2)} kg`;
     }
 
     function renderRows(el, rows) {
@@ -520,25 +692,113 @@
 
     async function render() {
       let events = [];
+      let limits = { maxMessagesPerHour: 0, maxDollarsPerDay: 0 };
       try {
-        const stored = await chrome.storage.local.get(STORAGE_KEY);
+        const stored = await chrome.storage.local.get([STORAGE_KEY, STORAGE_KEY_LIMITS]);
         events = stored[STORAGE_KEY] ?? [];
+        if (stored[STORAGE_KEY_LIMITS]) limits = { ...limits, ...stored[STORAGE_KEY_LIMITS] };
       } catch { /* extension context lost, ignore */ }
 
       const now = Date.now();
       const today = aggregate(events, startOfDay(now));
       const month = aggregate(events, startOfMonth(now));
+      const hour  = aggregate(events, now - HOUR_MS);
 
+      // Today
       shadow.getElementById("helix-today-n").textContent =
         `${fmtNum(today.tokens)} tokens · ${today.count} chats`;
       shadow.getElementById("helix-today-cost").textContent = fmtUsd(today.cost);
       renderRows(shadow.getElementById("helix-today-rows"), today.rows);
+      const t2 = shadow.getElementById("helix-today-co2");
+      t2.querySelector(".amt").textContent = fmtCO2(today.co2);
+      t2.querySelector(".cmp").textContent = co2Comparison(today.co2);
 
+      // Month
       shadow.getElementById("helix-month-n").textContent =
         `${fmtNum(month.tokens)} tokens · ${month.count} chats`;
       shadow.getElementById("helix-month-cost").textContent = fmtUsd(month.cost);
       renderRows(shadow.getElementById("helix-month-rows"), month.rows);
+      const m2 = shadow.getElementById("helix-month-co2");
+      m2.querySelector(".amt").textContent = fmtCO2(month.co2);
+      m2.querySelector(".cmp").textContent = co2Comparison(month.co2);
+
+      // Rate limits
+      renderLimits(limits, hour, today);
+
+      // Sync settings inputs (so the panel always reflects storage)
+      const hIn = shadow.getElementById("helix-input-hourly");
+      const dIn = shadow.getElementById("helix-input-daily");
+      if (document.activeElement !== hIn) hIn.value = limits.maxMessagesPerHour || "";
+      if (document.activeElement !== dIn) dIn.value = limits.maxDollarsPerDay   || "";
     }
+
+    function renderLimits(limits, hour, today) {
+      // Hourly messages
+      const hCap = Number(limits.maxMessagesPerHour) || 0;
+      const hUsed = hour.count;
+      const hPct = hCap > 0 ? Math.min(100, Math.round((hUsed / hCap) * 100)) : 0;
+      const hourlyRow = shadow.getElementById("helix-limit-hourly-row");
+      const hourlyBar = shadow.getElementById("helix-limit-hourly-bar");
+      hourlyRow.querySelector(".used").textContent = fmtNum(hUsed);
+      shadow.getElementById("helix-limit-hourly-cap").textContent = hCap > 0 ? fmtNum(hCap) : "off";
+      hourlyBar.firstElementChild.style.width = (hCap > 0 ? hPct : 0) + "%";
+      hourlyRow.className = "row" + (hPct >= 100 ? " is-over" : hPct >= 80 ? " is-warn" : "");
+      hourlyBar.className  = "bar" + (hPct >= 100 ? " is-over" : hPct >= 80 ? " is-warn" : "");
+
+      // Daily $
+      const dCap = Number(limits.maxDollarsPerDay) || 0;
+      const dUsed = today.cost;
+      const dPct = dCap > 0 ? Math.min(100, Math.round((dUsed / dCap) * 100)) : 0;
+      const dailyRow = shadow.getElementById("helix-limit-daily-row");
+      const dailyBar = shadow.getElementById("helix-limit-daily-bar");
+      dailyRow.querySelector(".used").textContent = fmtUsd(dUsed);
+      shadow.getElementById("helix-limit-daily-cap").textContent = dCap > 0 ? `$${dCap}` : "off";
+      dailyBar.firstElementChild.style.width = (dCap > 0 ? dPct : 0) + "%";
+      dailyRow.className = "row" + (dPct >= 100 ? " is-over" : dPct >= 80 ? " is-warn" : "");
+      dailyBar.className  = "bar" + (dPct >= 100 ? " is-over" : dPct >= 80 ? " is-warn" : "");
+
+      // Hint text under the bars
+      const hint = shadow.getElementById("helix-limit-hint");
+      if (hCap === 0 && dCap === 0) {
+        hint.textContent = "No caps set — expand Settings below to add one.";
+      } else if (hPct >= 100 || dPct >= 100) {
+        hint.textContent = "Over cap — orb glows red. Send button never blocked; you decide.";
+      } else if (hPct >= 80 || dPct >= 80) {
+        hint.textContent = "Approaching cap — orb glows amber.";
+      } else {
+        hint.textContent = "";
+      }
+
+      // Drive the orb's over-limit state (reuses is-over-budget)
+      if (hPct >= 100 || dPct >= 100) orb.classList.add("is-over-budget");
+      else if (!streaming) orb.classList.remove("is-over-budget");
+    }
+
+    // Settings input handlers — save to storage on change.
+    shadow.getElementById("helix-input-hourly").addEventListener("change", async (e) => {
+      const v = Math.max(0, Number(e.target.value) || 0);
+      await chrome.storage.local.set({
+        [STORAGE_KEY_LIMITS]: { ...(await getLimits()), maxMessagesPerHour: v },
+      });
+      render();
+    });
+    shadow.getElementById("helix-input-daily").addEventListener("change", async (e) => {
+      const v = Math.max(0, Number(e.target.value) || 0);
+      await chrome.storage.local.set({
+        [STORAGE_KEY_LIMITS]: { ...(await getLimits()), maxDollarsPerDay: v },
+      });
+      render();
+    });
+
+    async function getLimits() {
+      const { [STORAGE_KEY_LIMITS]: l } = await chrome.storage.local.get(STORAGE_KEY_LIMITS);
+      return l ?? { maxMessagesPerHour: 0, maxDollarsPerDay: 0 };
+    }
+
+    // Auto-refresh panel when background writes a new event / limit changes.
+    chrome.storage?.onChanged?.addListener?.((changes) => {
+      if (changes[STORAGE_KEY] || changes[STORAGE_KEY_LIMITS]) render();
+    });
 
     render();
   }

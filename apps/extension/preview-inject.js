@@ -63,10 +63,16 @@
   // whatever model was last used on this site.
   // ---------------------------------------------------------------------------
 
+  // In-memory cache of the user's rate limits + recent usage so we can
+  // decorate the preview badge with "x/N msgs left" when close to a cap.
+  let limits = { maxMessagesPerHour: 0, maxDollarsPerDay: 0 };
+  let usage  = { hourCount: 0, dayCost: 0 };
+  const HOUR_MS = 3_600_000;
+
   async function refreshCurrentFromCache() {
     try {
-      const { "helix.events": events = [], "helix.prices": prices = null } =
-        await chrome.storage.local.get(["helix.events", "helix.prices"]);
+      const { "helix.events": events = [], "helix.prices": prices = null, "helix.limits": storedLimits } =
+        await chrome.storage.local.get(["helix.events", "helix.prices", "helix.limits"]);
       // Most recent event on this source, if any
       const latest = [...events].reverse().find((e) => e.source === SOURCE);
       if (latest?.model) current.model = latest.model;
@@ -75,6 +81,13 @@
       if (prices && prices[current.model]?.input != null) {
         current.inputRate = prices[current.model].input;
       }
+      // Limits + current usage
+      if (storedLimits) limits = { ...limits, ...storedLimits };
+      const now = Date.now();
+      const startOfDayTs = (() => { const d = new Date(now); d.setHours(0,0,0,0); return d.getTime(); })();
+      usage.hourCount = events.filter((e) => e.ts >= now - HOUR_MS).length;
+      usage.dayCost   = events.filter((e) => e.ts >= startOfDayTs)
+                              .reduce((s, e) => s + (e.totalCost ?? 0), 0);
     } catch { /* extension context torn down; ignore */ }
   }
 
@@ -143,7 +156,8 @@
       `<span class="dot"></span>` +
       `<span class="tok">0 tok</span>` +
       `<span class="sep">·</span>` +
-      `<span class="cost">$0</span>`;
+      `<span class="cost">$0</span>` +
+      `<span class="limit" style="display:none;color:#f59e0b"></span>`;
     shadow.appendChild(b);
     // Set source hue via CSS variable on the wrapper (survives shadow boundary).
     b.style.setProperty("--source-hue", String(DEFAULTS[SOURCE].color));
@@ -160,7 +174,34 @@
     const cost = (tokens / 1_000_000) * current.inputRate;
     badge.shadow.querySelector(".tok").textContent = tokens.toLocaleString() + " tok";
     badge.shadow.querySelector(".cost").textContent = fmtCost(cost);
+    // Rate-limit hint, only when a cap is set and we're within 80% of it.
+    const limitEl = badge.shadow.querySelector(".limit");
+    const hint = limitHintText();
+    if (hint) {
+      limitEl.textContent = "· " + hint;
+      limitEl.style.display = "";
+    } else {
+      limitEl.style.display = "none";
+    }
     badge.el.classList.add("is-visible");
+  }
+
+  function limitHintText() {
+    // Hourly message cap
+    const hCap = Number(limits.maxMessagesPerHour) || 0;
+    if (hCap > 0) {
+      const remaining = hCap - usage.hourCount;
+      if (remaining <= 0) return `hourly cap reached`;
+      if (usage.hourCount / hCap >= 0.8) return `${remaining} msg left / hr`;
+    }
+    // Daily $ cap
+    const dCap = Number(limits.maxDollarsPerDay) || 0;
+    if (dCap > 0) {
+      const remaining = dCap - usage.dayCost;
+      if (remaining <= 0) return `daily $ cap reached`;
+      if (usage.dayCost / dCap >= 0.8) return `$${remaining.toFixed(2)} left today`;
+    }
+    return "";
   }
 
   // ---------------------------------------------------------------------------

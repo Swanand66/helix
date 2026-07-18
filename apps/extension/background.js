@@ -15,7 +15,16 @@ import { measure, updatePrices, PRICES } from "./tokenize.js";
 const STORAGE_KEY_EVENTS = "helix.events";
 const STORAGE_KEY_PRICES = "helix.prices";
 const STORAGE_KEY_PRICES_TS = "helix.prices.updatedAt";
+const STORAGE_KEY_LIMITS = "helix.limits";
 const MAX_EVENTS = 5000; // ~40 days at 100 chats/day
+
+// Default self-imposed usage limits. Users can edit these in the panel;
+// setting a value to 0 disables that particular cap.
+const DEFAULT_LIMITS = {
+  maxMessagesPerHour: 0,     // 0 = off
+  maxDollarsPerDay:   0,     // 0 = off (USD)
+  softBlock:          true,  // just warn + tint orb; false would hard-block send
+};
 
 const ALARM_NAME = "helix.refreshPrices";
 const REFRESH_HOURS = 24;
@@ -69,6 +78,7 @@ async function handle(msg) {
     inCost: measured.inCost,
     outCost: measured.outCost,
     totalCost: measured.totalCost,
+    co2g: measured.co2g,
     unpriced: measured.unpriced,
     approx: measured.approx,
   };
@@ -157,7 +167,22 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 // Also refresh on install/update — good UX for first run.
 chrome.runtime.onInstalled.addListener(() => {
   refreshPricesFromRemote();
+  ensureLimitsSeeded();
 });
+
+// Ensure limits object exists with defaults so the UI never crashes.
+async function ensureLimitsSeeded() {
+  try {
+    const { [STORAGE_KEY_LIMITS]: existing } =
+      await chrome.storage.local.get(STORAGE_KEY_LIMITS);
+    if (!existing || typeof existing !== "object") {
+      await chrome.storage.local.set({ [STORAGE_KEY_LIMITS]: DEFAULT_LIMITS });
+    }
+  } catch (err) {
+    console.warn("[helix bg] failed to seed limits:", err);
+  }
+}
+ensureLimitsSeeded();
 
 // Expose bundled fallback count in the log so devs can confirm what's loaded.
 console.log(

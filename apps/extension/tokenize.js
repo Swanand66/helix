@@ -166,6 +166,57 @@ export function priceFor(inTokens, outTokens, model) {
   return { inputCost, outputCost, totalCost: inputCost + outputCost, unpriced: false };
 }
 
+// ---------------------------------------------------------------------------
+// Carbon estimation
+// ---------------------------------------------------------------------------
+// Rough grams of CO₂-equivalent per 1M tokens (input + output combined).
+// Based on public disclosures + independent research (Anthropic, Google,
+// Hugging Face, "Making AI Less Thirsty" 2023). Frontier models cost more
+// due to bigger param counts + longer active GPU time. Reasoning models
+// (o3, o4) are especially expensive because they generate hidden thinking.
+//
+// These are ESTIMATES. Vary widely by data-center grid mix, batch size,
+// caching. We show them as "≈" not exact. Order of magnitude is what
+// matters — a haiku vs an opus differs by ~10×.
+const CARBON_G_PER_1M_TOKENS_BY_FAMILY = {
+  // Frontier / reasoning
+  "gpt-5":            340,
+  "gpt-4-turbo":      280,
+  "gpt-4o":           190,
+  "o4":               450,
+  "o3":               520,
+  "claude-5-opus":    380,
+  "claude-4.5-opus":  360,
+
+  // Mid-tier
+  "claude-5-sonnet":   180,
+  "claude-4.5-sonnet": 170,
+  "gemini-2.5-pro":    160,
+  "o4-mini":            95,
+  "o3-mini":           110,
+
+  // Small / efficient
+  "gpt-5-mini":         55,
+  "gpt-4o-mini":        45,
+  "claude-5-haiku":     55,
+  "claude-4.5-haiku":   50,
+  "gemini-2.5-flash":   35,
+  "gpt-5-nano":         18,
+};
+
+const CARBON_DEFAULT = 200; // for unknown models — cautious mid-range guess
+
+/**
+ * Estimate CO₂-equivalent grams for a single request.
+ * Simple linear model against total tokens; provider grid mix folded into
+ * the per-model constant.
+ */
+export function carbonFor(inTokens, outTokens, model) {
+  const total = (inTokens ?? 0) + (outTokens ?? 0);
+  const rate = CARBON_G_PER_1M_TOKENS_BY_FAMILY[model] ?? CARBON_DEFAULT;
+  return (total / 1_000_000) * rate;
+}
+
 /** Convenience: given raw payload, return a fully-priced usage entry. */
 export function measure({ inputText, outputText, rawModel }) {
   const model = normalizeModel(rawModel);
@@ -174,6 +225,7 @@ export function measure({ inputText, outputText, rawModel }) {
   const inTokens = approximateTokens(inputText ?? "", provider);
   const outTokens = approximateTokens(outputText ?? "", provider);
   const price = priceFor(inTokens, outTokens, model);
+  const co2g = carbonFor(inTokens, outTokens, model);
   return {
     model,
     rawModel,
@@ -183,6 +235,7 @@ export function measure({ inputText, outputText, rawModel }) {
     inCost: price.inputCost,
     outCost: price.outputCost,
     totalCost: price.totalCost,
+    co2g,
     unpriced: price.unpriced,
     approx: true,
   };
