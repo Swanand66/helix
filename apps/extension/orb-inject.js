@@ -204,6 +204,11 @@
       color: var(--accent);
       filter: drop-shadow(0 0 4px var(--accent-soft));
     }
+    .panel-h .h-actions {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+    }
     .panel-h button {
       background: transparent;
       border: none;
@@ -212,8 +217,16 @@
       cursor: pointer;
       font-size: 13px;
       border-radius: 4px;
+      font-family: inherit;
+    }
+    .panel-h .btn-text {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      padding: 4px 8px;
     }
     .panel-h button:hover { color: var(--panel-fg); background: rgba(148, 163, 184, 0.1); }
+    .panel-h button.is-danger:hover { color: #fca5a5; background: rgba(239, 68, 68, 0.12); }
 
     .panel-section {
       padding: 10px 12px;
@@ -282,7 +295,10 @@
             </svg>
             <span>Helix</span>
           </div>
-          <button id="helix-close">✕</button>
+          <div class="h-actions">
+            <button id="helix-reset" class="btn-text is-danger" title="Clear all tracked usage">Reset</button>
+            <button id="helix-close" title="Close">✕</button>
+          </div>
         </div>
         <div class="panel-section">
           <div class="panel-label">Today</div>
@@ -402,6 +418,19 @@
       e.stopPropagation();
     });
     closeBtn.addEventListener("click", () => panel.classList.add("is-hidden"));
+
+    // Reset — wipes tracked events (never touches cached prices).
+    const resetBtn = shadow.getElementById("helix-reset");
+    resetBtn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      if (!confirm("Clear all Helix usage history?\n\nThis erases every tracked chat locally. Cannot be undone.")) return;
+      try {
+        await chrome.storage.local.remove(STORAGE_KEY);
+      } catch (err) {
+        console.warn("[helix] reset failed:", err);
+      }
+      render();
+    });
 
     // Click outside the shadow root closes the panel.
     document.addEventListener("click", (e) => {
