@@ -48,7 +48,6 @@ Every measurement happens locally in your browser. Helix never sends your prompt
 WHAT IT TRACKS
   • ChatGPT (GPT-5, GPT-4o, GPT-4o mini, o3, o4, o4-mini)
   • Claude (Claude 5 Opus / Sonnet / Haiku, Claude 4.5 Opus / Sonnet / Haiku)
-  • Fable
   • More via daily price refresh
 
 HOW IT WORKS

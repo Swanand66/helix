@@ -39,7 +39,7 @@
 
   // Per-provider chars-per-token — matches tokenize.js FALLBACK_PRICES.
   const CHARS_PER_TOKEN = {
-    openai: 4.0, anthropic: 3.5, google: 4.0, meta: 3.8, mistral: 3.9, deepseek: 3.7, fable: 3.9,
+    openai: 4.0, anthropic: 3.5, google: 4.0, meta: 3.8, mistral: 3.9, deepseek: 3.7,
   };
 
   function estimateTokens(text, provider) {

@@ -16,7 +16,6 @@ const PROVIDER_PROFILES = {
   meta:      { charsPerToken: 3.8, nonAsciiMultiplier: 2.0 },
   mistral:   { charsPerToken: 3.9, nonAsciiMultiplier: 2.0 },
   deepseek:  { charsPerToken: 3.7, nonAsciiMultiplier: 2.0 },
-  fable:     { charsPerToken: 3.9, nonAsciiMultiplier: 2.0 },
 };
 
 // Bundled fallback prices (USD per 1M tokens). These ship WITH the extension
@@ -56,10 +55,6 @@ const FALLBACK_PRICES = {
   // Google — gemini 2.5 family
   "gemini-2.5-pro":      { provider: "google",    input: 1.25, output: 5.0  },
   "gemini-2.5-flash":    { provider: "google",    input: 0.1,  output: 0.4  },
-
-  // Fable (verify against fable pricing page)
-  "fable":               { provider: "fable",     input: 2.0,  output: 10.0 },
-  "fable-mini":          { provider: "fable",     input: 0.3,  output: 1.2  },
 };
 
 // Live mutable prices — initialized from fallback, updated at runtime by
@@ -114,10 +109,6 @@ const MODEL_NORMALIZERS = [
   // Google
   [/gemini.*pro/i,                 () => "gemini-2.5-pro"],
   [/gemini.*flash/i,               () => "gemini-2.5-flash"],
-
-  // Fable
-  [/^fable-?mini/i,                () => "fable-mini"],
-  [/^fable/i,                      () => "fable"],
 ];
 
 /**

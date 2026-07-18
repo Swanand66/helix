@@ -156,14 +156,6 @@
         drop-shadow(0 0 14px hsla(210, 100%, 55%, 0.5));
     }
 
-    .orb.is-streaming.is-source-fable { color: hsl(280, 100%, 65%); }
-    .orb.is-streaming.is-source-fable .logo-trace {
-      filter:
-        drop-shadow(0 0 2px hsla(280, 100%, 95%, 1))
-        drop-shadow(0 0 6px hsla(280, 100%, 70%, 0.9))
-        drop-shadow(0 0 14px hsla(280, 100%, 55%, 0.5));
-    }
-
     /* ============================= PANEL ============================= */
 
     .panel {
@@ -361,7 +353,6 @@
       "is-source-chatgpt",
       "is-source-claude",
       "is-source-gemini",
-      "is-source-fable",
     ];
 
     let streaming = false;

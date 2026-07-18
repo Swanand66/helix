@@ -22,7 +22,6 @@ Install the browser extension, chat like normal, and see exactly how much every 
 - **OpenAI**: gpt-5, gpt-5-mini, gpt-5-nano, gpt-4o, gpt-4o-mini, gpt-4-turbo, o3, o3-mini, o4, o4-mini
 - **Anthropic**: claude-5-opus, claude-5-sonnet, claude-5-haiku, claude-4.5-opus, claude-4.5-sonnet, claude-4.5-haiku
 - **Google**: gemini-2.5-pro, gemini-2.5-flash
-- **Fable**: fable, fable-mini
 
 More arrive automatically via the [daily price refresh](https://github.com/Swanand66/helix_price).
 
@@ -112,7 +111,6 @@ node scripts/package.mjs
 
 - [x] v0.1 — Extension for ChatGPT + Claude with in-page glowing ⌘ orb
 - [x] v0.1 — Daily auto-refresh of pricing via GitHub Action
-- [ ] v0.2 — Real Fable interception (need endpoint URL)
 - [ ] v0.2 — Gemini + Perplexity + Copilot Chat support
 - [ ] v0.3 — Optional Tauri desktop app for "always visible" outside the browser
 - [ ] v1.0 — Budget alerts, per-project tags, exportable history
