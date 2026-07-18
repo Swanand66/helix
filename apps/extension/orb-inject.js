@@ -424,7 +424,7 @@
           <div class="panel-rows" id="helix-today-rows"></div>
           <div class="co2" id="helix-today-co2">
             <span><span class="amt">0 g</span> CO₂ <span class="cmp"></span></span>
-            <a href="https://cooleffect.org/collections/all" target="_blank" rel="noopener">Offset →</a>
+            <a href="https://www.wren.co/subscribe" target="_blank" rel="noopener">Offset →</a>
           </div>
         </div>
 
