@@ -25,6 +25,7 @@ const INCLUDE = [
   "background.js",
   "content.js",
   "orb-inject.js",
+  "preview-inject.js",
   "page-hook.js",
   "popup.html",
   "popup.js",

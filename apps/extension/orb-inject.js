@@ -128,6 +128,42 @@
     .orb.is-paused .logo-base { opacity: 0.4; filter: none; }
     .orb.is-paused .logo-trace { opacity: 0; filter: none; }
 
+    /* --------------------------------------------------------------------- */
+    /* Per-source colors — applied only while streaming, so idle stays cyan. */
+    /* --------------------------------------------------------------------- */
+
+    .orb.is-streaming.is-source-chatgpt { color: hsl(140, 90%, 55%); }
+    .orb.is-streaming.is-source-chatgpt .logo-trace {
+      filter:
+        drop-shadow(0 0 2px hsla(140, 100%, 95%, 1))
+        drop-shadow(0 0 6px hsla(140, 100%, 70%, 0.9))
+        drop-shadow(0 0 14px hsla(140, 100%, 55%, 0.5));
+    }
+
+    .orb.is-streaming.is-source-claude { color: hsl(25, 100%, 62%); }
+    .orb.is-streaming.is-source-claude .logo-trace {
+      filter:
+        drop-shadow(0 0 2px hsla(25, 100%, 95%, 1))
+        drop-shadow(0 0 6px hsla(25, 100%, 70%, 0.9))
+        drop-shadow(0 0 14px hsla(25, 100%, 55%, 0.55));
+    }
+
+    .orb.is-streaming.is-source-gemini { color: hsl(210, 100%, 62%); }
+    .orb.is-streaming.is-source-gemini .logo-trace {
+      filter:
+        drop-shadow(0 0 2px hsla(210, 100%, 95%, 1))
+        drop-shadow(0 0 6px hsla(210, 100%, 70%, 0.9))
+        drop-shadow(0 0 14px hsla(210, 100%, 55%, 0.5));
+    }
+
+    .orb.is-streaming.is-source-fable { color: hsl(280, 100%, 65%); }
+    .orb.is-streaming.is-source-fable .logo-trace {
+      filter:
+        drop-shadow(0 0 2px hsla(280, 100%, 95%, 1))
+        drop-shadow(0 0 6px hsla(280, 100%, 70%, 0.9))
+        drop-shadow(0 0 14px hsla(280, 100%, 55%, 0.5));
+    }
+
     /* ============================= PANEL ============================= */
 
     .panel {
@@ -321,16 +357,32 @@
 
     // --- streaming state -----------------------------------------------------
 
+    const SOURCE_CLASSES = [
+      "is-source-chatgpt",
+      "is-source-claude",
+      "is-source-gemini",
+      "is-source-fable",
+    ];
+
     let streaming = false;
     let stopTimer = null;
-    function startStreaming() {
+    let currentSource = null;
+
+    function applySourceClass(source) {
+      for (const c of SOURCE_CLASSES) orb.classList.remove(c);
+      if (source) orb.classList.add(`is-source-${source}`);
+    }
+
+    function startStreaming(source) {
       streaming = true;
+      currentSource = source || currentSource;
       clearTimeout(stopTimer);
       stopTimer = null;
+      applySourceClass(currentSource);
       orb.classList.add("is-streaming");
     }
     function bumpStreaming() {
-      if (!streaming) startStreaming();
+      if (!streaming) startStreaming(currentSource);
       else if (stopTimer) { clearTimeout(stopTimer); stopTimer = null; }
     }
     function stopStreaming() {
@@ -339,6 +391,7 @@
       clearTimeout(stopTimer);
       stopTimer = setTimeout(() => {
         orb.classList.remove("is-streaming");
+        applySourceClass(null); // reset to default cyan when quiet
         stopTimer = null;
         render(); // refresh totals when a chat finishes
       }, GRACE_MS);
@@ -494,7 +547,7 @@
     if (!msg || msg.type !== "HELIX_STREAM") return;
     const api = window.__HELIX_ORB_API__;
     if (!api) return;
-    if (msg.event === "start")     api.startStreaming();
+    if (msg.event === "start")     api.startStreaming(msg.source);
     else if (msg.event === "bump") api.bumpStreaming();
     else if (msg.event === "end")  api.stopStreaming();
   });
