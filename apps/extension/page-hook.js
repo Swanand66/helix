@@ -46,6 +46,21 @@
     }
     const method = (init?.method ?? (typeof input !== "string" ? input?.method : "GET") ?? "GET").toUpperCase();
 
+    // TEMP diagnostic on Gemini pages only — see every POST that fires,
+    // regardless of URL. Helps locate the actual chat endpoint if it lives
+    // on a different host than we expected.
+    if (location.host.includes("gemini.google.com") || location.host.includes("aistudio.google.com")) {
+      if (method === "POST") {
+        const shortUrl = url.length > 140 ? url.slice(0, 140) + "…" : url;
+        console.log(
+          "%c[helix diag]%c ANY fetch POST %s",
+          "color:#f59e0b;font-weight:bold",
+          "color:inherit",
+          shortUrl,
+        );
+      }
+    }
+
     const isChatGPT = CHATGPT_URL.test(url);
     const isClaudeReq = CLAUDE_URL_BROAD.test(url);
     const isGeminiReq = GEMINI_URL_BROAD.test(url);
@@ -332,6 +347,111 @@
       }
     }
     return "";
+  }
+
+  // ===========================================================================
+  // TEMP diagnostics — only when on a Gemini page. Helps identify which
+  // network transport Gemini actually uses (fetch / XHR / WebSocket / EventSource
+  // / worker). Strip once Gemini tracking works.
+  // ===========================================================================
+
+  const IS_GEMINI_PAGE =
+    location.host.includes("gemini.google.com") ||
+    location.host.includes("aistudio.google.com");
+
+  if (IS_GEMINI_PAGE) {
+    // --- XHR ---
+    try {
+      const OriginalXHR = window.XMLHttpRequest;
+      function HelixXHR() {
+        const xhr = new OriginalXHR();
+        const state = { url: "", method: "" };
+        const origOpen = xhr.open;
+        xhr.open = function (m, u, ...rest) {
+          state.method = String(m || "").toUpperCase();
+          state.url = String(u || "");
+          return origOpen.call(this, m, u, ...rest);
+        };
+        const origSend = xhr.send;
+        xhr.send = function (body) {
+          if (state.method === "POST") {
+            console.log(
+              "%c[helix diag]%c XHR POST %s | bodyLen=%s",
+              "color:#f59e0b;font-weight:bold",
+              "color:inherit",
+              state.url.length > 140 ? state.url.slice(0, 140) + "…" : state.url,
+              body?.length ?? (body ? "?" : 0),
+            );
+          }
+          return origSend.call(this, body);
+        };
+        return xhr;
+      }
+      HelixXHR.prototype = OriginalXHR.prototype;
+      window.XMLHttpRequest = HelixXHR;
+    } catch (e) {
+      console.warn("[helix diag] XHR override failed:", e);
+    }
+
+    // --- WebSocket ---
+    try {
+      const OriginalWS = window.WebSocket;
+      function HelixWS(url, protocols) {
+        const ws = protocols !== undefined ? new OriginalWS(url, protocols) : new OriginalWS(url);
+        console.log(
+          "%c[helix diag]%c WebSocket opened %s",
+          "color:#f59e0b;font-weight:bold",
+          "color:inherit",
+          String(url).slice(0, 140),
+        );
+        ws.addEventListener("message", (e) => {
+          const d = e.data;
+          const preview = typeof d === "string" ? d.slice(0, 140) : `[${typeof d} ${d?.byteLength ?? d?.size ?? "?"}B]`;
+          console.log("%c[helix diag]%c WS msg: %s", "color:#f59e0b;font-weight:bold", "color:inherit", preview);
+        });
+        return ws;
+      }
+      HelixWS.prototype = OriginalWS.prototype;
+      HelixWS.CONNECTING = OriginalWS.CONNECTING;
+      HelixWS.OPEN = OriginalWS.OPEN;
+      HelixWS.CLOSING = OriginalWS.CLOSING;
+      HelixWS.CLOSED = OriginalWS.CLOSED;
+      window.WebSocket = HelixWS;
+    } catch (e) {
+      console.warn("[helix diag] WS override failed:", e);
+    }
+
+    // --- EventSource ---
+    try {
+      const OriginalES = window.EventSource;
+      if (OriginalES) {
+        function HelixES(url, cfg) {
+          const es = cfg !== undefined ? new OriginalES(url, cfg) : new OriginalES(url);
+          console.log(
+            "%c[helix diag]%c EventSource opened %s",
+            "color:#f59e0b;font-weight:bold",
+            "color:inherit",
+            String(url).slice(0, 140),
+          );
+          es.addEventListener("message", (e) => {
+            console.log(
+              "%c[helix diag]%c ES msg: %s",
+              "color:#f59e0b;font-weight:bold",
+              "color:inherit",
+              String(e.data || "").slice(0, 140),
+            );
+          });
+          return es;
+        }
+        HelixES.prototype = OriginalES.prototype;
+        HelixES.CONNECTING = OriginalES.CONNECTING;
+        HelixES.OPEN = OriginalES.OPEN;
+        HelixES.CLOSED = OriginalES.CLOSED;
+        window.EventSource = HelixES;
+      }
+    } catch (e) {
+      console.warn("[helix diag] ES override failed:", e);
+    }
   }
 
   // Visible in the page console at default log level.
