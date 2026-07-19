@@ -151,12 +151,19 @@
         drop-shadow(0 0 14px hsla(25, 100%, 55%, 0.55));
     }
 
-    .orb.is-streaming.is-source-gemini { color: hsl(210, 100%, 62%); }
+    /* Gemini — paint the trace with the Gemini brand gradient and layer
+       rainbow drop-shadows so the glow reads as red→yellow→green→blue→violet.
+       Base outline still uses currentColor (dim white/cyan) so the "off" look
+       stays neutral. */
+    .orb.is-streaming.is-source-gemini { color: #ffffff; }
     .orb.is-streaming.is-source-gemini .logo-trace {
+      stroke: url(#helix-gemini-stroke);
       filter:
-        drop-shadow(0 0 2px hsla(210, 100%, 95%, 1))
-        drop-shadow(0 0 6px hsla(210, 100%, 70%, 0.9))
-        drop-shadow(0 0 14px hsla(210, 100%, 55%, 0.5));
+        drop-shadow(0 0 2px hsla(15, 100%, 75%, 0.95))
+        drop-shadow(0 0 6px hsla(45, 100%, 65%, 0.80))
+        drop-shadow(0 0 10px hsla(140, 80%, 55%, 0.55))
+        drop-shadow(0 0 14px hsla(215, 100%, 60%, 0.55))
+        drop-shadow(0 0 18px hsla(275, 100%, 65%, 0.45));
     }
 
     /* ============================= PANEL ============================= */
@@ -476,6 +483,16 @@
 
       <div class="orb" id="helix-orb" title="Helix — click to see usage">
         <svg class="logo" viewBox="0 0 24 24" fill="none">
+          <defs>
+            <!-- Gemini brand gradient (Google logo palette + a violet tail). -->
+            <linearGradient id="helix-gemini-stroke" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0"    stop-color="#EA4335"/>
+              <stop offset="0.30" stop-color="#FBBC05"/>
+              <stop offset="0.55" stop-color="#34A853"/>
+              <stop offset="0.85" stop-color="#4285F4"/>
+              <stop offset="1"    stop-color="#A855F7"/>
+            </linearGradient>
+          </defs>
           <path class="logo-base"  d="${LOGO_PATH}" pathLength="100"/>
           <path class="logo-trace" d="${LOGO_PATH}" pathLength="100"/>
         </svg>
