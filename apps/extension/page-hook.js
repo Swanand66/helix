@@ -175,7 +175,9 @@
       "color:#06b6d4;font-weight:bold",
       "color:inherit",
     );
-    window.postMessage({ type: "HELIX_USAGE", payload }, "*");
+    if (shouldEmit(source, model, inputText, outText)) {
+      window.postMessage({ type: "HELIX_USAGE", payload }, "*");
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -319,10 +321,53 @@
   // MUST be skipped so refreshing a chat doesn't re-count old tokens.
   // If Google renames the send-message RPC, add its new id here.
   const GEMINI_CHAT_RPCIDS = ["ESY5D", "SNlM0e"];
-  // Guard against tracking the same logical send twice (Gemini sometimes
-  // retries or emits a follow-up call).
-  const DEDUP_WINDOW_MS = 1500;
-  let lastGeminiTrackMs = 0;
+
+  // ---------------------------------------------------------------------------
+  // Cross-provider dedup guard
+  // ---------------------------------------------------------------------------
+  // Belt-and-suspenders against ANY site double-emitting a HELIX_USAGE event
+  // for the same logical chat (page refresh replays, retries, back/forward
+  // navigation, tab restore, etc.). We hash a compact fingerprint of each
+  // event; if we've seen the same fingerprint in the last few seconds, we
+  // silently drop the duplicate.
+  //
+  // The fingerprint is deliberately loose (source + model + input/output
+  // length signature + input prefix) so it survives minor variations while
+  // catching the "identical chat" case. Real user-typed follow-ups will
+  // differ in input text and won't collide.
+  const DEDUP_WINDOW_MS = 4000;
+  const recentEvents = new Map(); // fingerprint -> timestamp
+
+  function fingerprintEvent(source, model, inputText, outputText) {
+    const i = String(inputText || "");
+    const o = String(outputText || "");
+    // First 80 chars of input + both lengths — cheap and effective.
+    return `${source}|${model}|${i.length}|${o.length}|${i.slice(0, 80)}`;
+  }
+
+  function shouldEmit(source, model, inputText, outputText) {
+    const fp = fingerprintEvent(source, model, inputText, outputText);
+    const now = Date.now();
+    const last = recentEvents.get(fp);
+    if (last && now - last < DEDUP_WINDOW_MS) {
+      console.log(
+        "%c[helix]%c dedup: skipped duplicate %s event (fp match, %dms old)",
+        "color:#f59e0b;font-weight:bold",
+        "color:inherit",
+        source,
+        now - last,
+      );
+      return false;
+    }
+    recentEvents.set(fp, now);
+    // Occasional cleanup so the map doesn't grow unbounded.
+    if (recentEvents.size > 100) {
+      for (const [k, t] of recentEvents) {
+        if (now - t > DEDUP_WINDOW_MS * 3) recentEvents.delete(k);
+      }
+    }
+    return true;
+  }
 
   function isGeminiChatSendUrl(url) {
     if (!url.includes(BARD_BATCHEXECUTE)) return false;
@@ -352,15 +397,12 @@
           state.body = body;
           state.bodyLen = typeof body === "string" ? body.length : 0;
 
-          const now = Date.now();
           const isChatXhr =
             state.method === "POST" &&
             isGeminiChatSendUrl(state.url) &&
-            state.bodyLen >= MIN_CHAT_BODY_BYTES &&
-            now - lastGeminiTrackMs > DEDUP_WINDOW_MS;
+            state.bodyLen >= MIN_CHAT_BODY_BYTES;
 
           if (isChatXhr) {
-            lastGeminiTrackMs = now;
             const model = detectGeminiModel();
             window.postMessage(
               { type: "HELIX_STREAM", event: "start", source: "gemini", model },
@@ -378,20 +420,22 @@
                 inputText.length,
                 outText.length,
               );
-              window.postMessage(
-                {
-                  type: "HELIX_USAGE",
-                  payload: {
-                    source: "gemini",
-                    model,
-                    inputText,
-                    outputText: outText,
-                    ts: Date.now(),
-                    url: state.url,
+              if (shouldEmit("gemini", model, inputText, outText)) {
+                window.postMessage(
+                  {
+                    type: "HELIX_USAGE",
+                    payload: {
+                      source: "gemini",
+                      model,
+                      inputText,
+                      outputText: outText,
+                      ts: Date.now(),
+                      url: state.url,
+                    },
                   },
-                },
-                "*",
-              );
+                  "*",
+                );
+              }
               window.postMessage({ type: "HELIX_STREAM", event: "end" }, "*");
             });
 
