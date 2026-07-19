@@ -17,6 +17,7 @@
   const GRACE_MS = 900;
   const STORAGE_KEY = "helix.events";
   const STORAGE_KEY_LIMITS = "helix.limits";
+  const STORAGE_KEY_HIDDEN = "helix.orbHidden";
   const HOUR_MS = 3_600_000;
 
   const CSS = `
@@ -493,7 +494,14 @@
     host.id = HOST_ID;
     host.style.cssText =
       "position:fixed;right:24px;bottom:24px;width:44px;height:44px;" +
-      "z-index:2147483647;pointer-events:none;";
+      "z-index:2147483647;pointer-events:none;" +
+      "transition:opacity 260ms ease;";
+
+    // Restore prior hidden state before first paint so the orb doesn't
+    // flash into view for a frame if the user had hidden it earlier.
+    chrome.storage?.local?.get?.(STORAGE_KEY_HIDDEN).then((r) => {
+      if (r?.[STORAGE_KEY_HIDDEN]) applyHidden(host, true);
+    }).catch(() => {});
 
     const shadow = host.attachShadow({ mode: "open" });
     const style = document.createElement("style");
@@ -831,5 +839,46 @@
     if (msg.event === "start")     api.startStreaming(msg.source);
     else if (msg.event === "bump") api.bumpStreaming();
     else if (msg.event === "end")  api.stopStreaming();
+  });
+
+  // ---------------------------------------------------------------------------
+  // Keyboard shortcut bridge
+  // Background service worker fires HELIX_TOGGLE_ORB when the user hits
+  // Ctrl+Shift+H (Cmd+Shift+H on Mac). We flip visibility + persist so it
+  // survives page reloads and syncs across other tabs via storage.onChanged.
+  // ---------------------------------------------------------------------------
+
+  function applyHidden(host, hidden) {
+    if (!host) return;
+    host.style.opacity = hidden ? "0" : "";
+    // pointerEvents was "none" on the host already; keep it that way
+    // (only inner wrapper is interactive), so no change needed there.
+    host.dataset.helixHidden = hidden ? "1" : "";
+  }
+
+  async function toggleOrbVisibility() {
+    const host = document.getElementById(HOST_ID);
+    if (!host) return;
+    let next;
+    try {
+      const cur = await chrome.storage.local.get(STORAGE_KEY_HIDDEN);
+      next = !cur[STORAGE_KEY_HIDDEN];
+      await chrome.storage.local.set({ [STORAGE_KEY_HIDDEN]: next });
+    } catch {
+      // Storage failed — still toggle in-page so the shortcut visibly works.
+      next = host.dataset.helixHidden !== "1";
+    }
+    applyHidden(host, next);
+  }
+
+  chrome.runtime?.onMessage?.addListener?.((msg) => {
+    if (msg?.type === "HELIX_TOGGLE_ORB") toggleOrbVisibility();
+  });
+
+  // If another tab toggles the state, mirror it here so all tabs stay in sync.
+  chrome.storage?.onChanged?.addListener?.((changes) => {
+    if (!changes[STORAGE_KEY_HIDDEN]) return;
+    const host = document.getElementById(HOST_ID);
+    applyHidden(host, !!changes[STORAGE_KEY_HIDDEN].newValue);
   });
 })();

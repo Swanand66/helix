@@ -188,3 +188,21 @@ ensureLimitsSeeded();
 console.log(
   `[helix bg] service worker up · fallback prices: ${Object.keys(PRICES).length} models`,
 );
+
+// ---------------------------------------------------------------------------
+// Keyboard shortcut: Ctrl+Shift+H (Cmd+Shift+H on Mac) toggles orb visibility
+// ---------------------------------------------------------------------------
+// Chrome reserves Ctrl+H for History and won't let extensions bind it. Users
+// can rebind our shortcut at chrome://extensions/shortcuts.
+// ---------------------------------------------------------------------------
+
+chrome.commands.onCommand.addListener(async (command) => {
+  if (command !== "toggle-orb") return;
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab?.id) return;
+    await chrome.tabs.sendMessage(tab.id, { type: "HELIX_TOGGLE_ORB" });
+  } catch {
+    // No content script in tab (e.g. chrome://, non-supported site). Ignore.
+  }
+});
