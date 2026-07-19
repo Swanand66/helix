@@ -46,21 +46,6 @@
     }
     const method = (init?.method ?? (typeof input !== "string" ? input?.method : "GET") ?? "GET").toUpperCase();
 
-    // TEMP diagnostic on Gemini pages only — see every POST that fires,
-    // regardless of URL. Helps locate the actual chat endpoint if it lives
-    // on a different host than we expected.
-    if (location.host.includes("gemini.google.com") || location.host.includes("aistudio.google.com")) {
-      if (method === "POST") {
-        const shortUrl = url.length > 140 ? url.slice(0, 140) + "…" : url;
-        console.log(
-          "%c[helix diag]%c ANY fetch POST %s",
-          "color:#f59e0b;font-weight:bold",
-          "color:inherit",
-          shortUrl,
-        );
-      }
-    }
-
     const isChatGPT = CHATGPT_URL.test(url);
     const isClaudeReq = CLAUDE_URL_BROAD.test(url);
     const isGeminiReq = GEMINI_URL_BROAD.test(url);
@@ -93,13 +78,12 @@
       isClaude = urlLooksLikeChat && bodyLooksLikeChat;
     }
 
-    // For Gemini: two flavors of payload. AI Studio + REST API use standard
+    // For Gemini via fetch (AI Studio + REST API): standard shape
     //   { contents: [{ role, parts: [{ text }] }], model, ... }.
-    // The consumer Gemini app uses a batchexecute POST with form-encoded body
-    // that we can't easily JSON.parse — for those we accept the URL hint alone
-    // and let response parsing best-effort fill in what it can.
+    // The consumer Gemini app (gemini.google.com) does NOT use fetch — it
+    // uses XHR and is handled by the XHR interceptor further down.
     let isGemini = false;
-    if (isGeminiReq) {
+    if (isGeminiReq && !url.includes("gemini.google.com")) {
       const urlLooksLikeChat = GEMINI_CHAT_HINT.test(url);
       const bodyLooksLikeChat = !!(
         reqBody && (
@@ -108,33 +92,7 @@
           typeof reqBody.prompt === "string"
         )
       );
-      // gemini.google.com posts form-encoded blobs that JSON.parse can't read;
-      // accept URL match alone for that host.
-      const isConsumerApp = url.includes("gemini.google.com");
-      isGemini = urlLooksLikeChat && (bodyLooksLikeChat || isConsumerApp);
-
-      // TEMP diagnostic — every gemini POST is logged so we can see what URLs
-      // and payload shapes their web app actually uses. Remove once tracking
-      // works reliably on gemini.google.com.
-      let bodyPreview = "";
-      try {
-        const raw = init?.body;
-        if (typeof raw === "string") bodyPreview = raw.slice(0, 160);
-        else if (raw instanceof FormData) bodyPreview = "[FormData]";
-        else if (raw instanceof URLSearchParams) bodyPreview = raw.toString().slice(0, 160);
-        else if (raw instanceof ArrayBuffer) bodyPreview = `[ArrayBuffer ${raw.byteLength}B]`;
-        else if (raw) bodyPreview = String(raw).slice(0, 160);
-      } catch { bodyPreview = "?"; }
-      console.log(
-        "%c[helix]%c gemini POST %s | urlHint=%s bodyKeys=%o bodyPreview=%s -> tracking=%s",
-        "color:#06b6d4;font-weight:bold",
-        "color:inherit",
-        url.replace(/^https:\/\/[^/]+/, ""),
-        urlLooksLikeChat,
-        reqBody ? Object.keys(reqBody) : null,
-        bodyPreview,
-        isGemini,
-      );
+      isGemini = urlLooksLikeChat && bodyLooksLikeChat;
     }
 
     // If we decided this isn't a chat request, let it pass through untouched.
@@ -175,24 +133,12 @@
     const decoder = new TextDecoder();
     let buffer = "";
     let outText = "";
-    let firstChunkLogged = false;
 
     try {
       while (true) {
         const { value, done } = await reader.read();
         if (done) break;
         buffer += decoder.decode(value, { stream: true });
-
-        // TEMP: log first chunk for gemini so we can see what to parse.
-        if (source === "gemini" && !firstChunkLogged) {
-          firstChunkLogged = true;
-          console.log(
-            "%c[helix]%c gemini first response chunk (first 220 chars):\n%s",
-            "color:#06b6d4;font-weight:bold",
-            "color:inherit",
-            buffer.slice(0, 220),
-          );
-        }
 
         // Parse whole SSE events; keep the trailing partial for next chunk.
         const events = buffer.split("\n\n");
@@ -350,39 +296,88 @@
   }
 
   // ===========================================================================
-  // TEMP diagnostics — only when on a Gemini page. Helps identify which
-  // network transport Gemini actually uses (fetch / XHR / WebSocket / EventSource
-  // / worker). Strip once Gemini tracking works.
+  // Gemini web (gemini.google.com) uses XMLHttpRequest, not fetch, for its
+  // chat completion. All chat traffic goes to /_/BardChatUi/data/batchexecute
+  // — a proprietary Google internal RPC endpoint. The body is form-encoded
+  // (`f.req=...&at=...&_reqid=...`) with a URL-encoded JSON blob inside.
+  // The response starts with `)]}'` and contains nested JSON arrays with
+  // the assistant's reply strings embedded.
+  //
+  // We intercept XHR.send, filter to chat-shaped requests, and extract
+  // rough token counts from the response text.
   // ===========================================================================
 
   const IS_GEMINI_PAGE =
     location.host.includes("gemini.google.com") ||
     location.host.includes("aistudio.google.com");
 
+  const BARD_BATCHEXECUTE = "/_/BardChatUi/data/batchexecute";
+  const MIN_CHAT_BODY_BYTES = 500; // filter out ping/telemetry ops
+
   if (IS_GEMINI_PAGE) {
-    // --- XHR ---
     try {
       const OriginalXHR = window.XMLHttpRequest;
       function HelixXHR() {
         const xhr = new OriginalXHR();
-        const state = { url: "", method: "" };
+        const state = { url: "", method: "", body: null, bodyLen: 0 };
+
         const origOpen = xhr.open;
         xhr.open = function (m, u, ...rest) {
           state.method = String(m || "").toUpperCase();
           state.url = String(u || "");
           return origOpen.call(this, m, u, ...rest);
         };
+
         const origSend = xhr.send;
         xhr.send = function (body) {
-          if (state.method === "POST") {
-            console.log(
-              "%c[helix diag]%c XHR POST %s | bodyLen=%s",
-              "color:#f59e0b;font-weight:bold",
-              "color:inherit",
-              state.url.length > 140 ? state.url.slice(0, 140) + "…" : state.url,
-              body?.length ?? (body ? "?" : 0),
+          state.body = body;
+          state.bodyLen = typeof body === "string" ? body.length : 0;
+
+          const isChatXhr =
+            state.method === "POST" &&
+            state.url.includes(BARD_BATCHEXECUTE) &&
+            state.bodyLen >= MIN_CHAT_BODY_BYTES;
+
+          if (isChatXhr) {
+            const model = detectGeminiModel();
+            window.postMessage(
+              { type: "HELIX_STREAM", event: "start", source: "gemini", model },
+              "*",
             );
+
+            xhr.addEventListener("loadend", () => {
+              const outText = extractGeminiOutput(xhr.responseText || "");
+              const inputText = extractGeminiInput(state.body);
+              console.log(
+                "%c[helix]%c captured gemini · model=%s · in=%dch · out=%dch",
+                "color:#06b6d4;font-weight:bold",
+                "color:inherit",
+                model,
+                inputText.length,
+                outText.length,
+              );
+              window.postMessage(
+                {
+                  type: "HELIX_USAGE",
+                  payload: {
+                    source: "gemini",
+                    model,
+                    inputText,
+                    outputText: outText,
+                    ts: Date.now(),
+                    url: state.url,
+                  },
+                },
+                "*",
+              );
+              window.postMessage({ type: "HELIX_STREAM", event: "end" }, "*");
+            });
+
+            xhr.addEventListener("progress", () => {
+              window.postMessage({ type: "HELIX_STREAM", event: "bump" }, "*");
+            });
           }
+
           return origSend.call(this, body);
         };
         return xhr;
@@ -390,70 +385,84 @@
       HelixXHR.prototype = OriginalXHR.prototype;
       window.XMLHttpRequest = HelixXHR;
     } catch (e) {
-      console.warn("[helix diag] XHR override failed:", e);
+      console.warn("[helix] XHR override failed:", e);
     }
+  }
 
-    // --- WebSocket ---
+  /** Detect which Gemini model is selected from the model-picker button in
+   *  the DOM. Falls back to gemini-2.5-pro. Small + selector-tolerant. */
+  function detectGeminiModel() {
     try {
-      const OriginalWS = window.WebSocket;
-      function HelixWS(url, protocols) {
-        const ws = protocols !== undefined ? new OriginalWS(url, protocols) : new OriginalWS(url);
-        console.log(
-          "%c[helix diag]%c WebSocket opened %s",
-          "color:#f59e0b;font-weight:bold",
-          "color:inherit",
-          String(url).slice(0, 140),
+      const text = (document.body?.innerText || "").toLowerCase();
+      // The visible label in the composer's model dropdown is a strong signal.
+      // Look for common tokens; ordering matters (specific first).
+      if (/flash[- ]?lite/.test(text)) return "gemini-2.5-flash";
+      if (/\bflash\b/.test(text))     return "gemini-2.5-flash";
+      if (/\bpro\b/.test(text))       return "gemini-2.5-pro";
+    } catch {}
+    return "gemini-2.5-pro";
+  }
+
+  /** Pull the user's prompt out of Gemini's form-encoded XHR body.
+   *  Body shape: `f.req=<url-encoded JSON>&at=...`. The JSON is a nested
+   *  array; the user message lives as a plain string somewhere near the top.
+   *  We take a rough approach: url-decode f.req and scan for long quoted
+   *  strings. Good enough for token estimation. */
+  function extractGeminiInput(body) {
+    if (typeof body !== "string") return "";
+    try {
+      const m = body.match(/(?:^|&)f\.req=([^&]+)/);
+      if (!m) return "";
+      const decoded = decodeURIComponent(m[1]);
+      // Look for the first significant quoted string (user prompt is usually
+      // the longest at the start of the payload).
+      const strings = (decoded.match(/"([^"\\]{4,}(?:\\.[^"\\]*)*)"/g) || [])
+        .map((s) => JSON.parse(s))
+        .filter((s) => typeof s === "string" && /\s/.test(s));
+      return strings.slice(0, 3).join("\n"); // first few, likely prompt + attachments
+    } catch {
+      return "";
+    }
+  }
+
+  /** Extract assistant text from a Gemini batchexecute response. The response
+   *  starts with `)]}'` then contains one or more chunks like:
+   *    N
+   *    [["wrb.fr","<rpcid>","<escaped JSON string>", ...], ...]
+   *  The inner string contains the assistant reply nested deep. We do a two-
+   *  pass regex extraction — good approximation for token counting purposes. */
+  function extractGeminiOutput(responseText) {
+    if (!responseText) return "";
+    try {
+      // Strip the anti-XSSI prefix.
+      const cleaned = responseText.replace(/^\)\]}'\s*/, "");
+      // Grab every long-enough quoted string, unescape it, and keep the
+      // ones that look like natural language (contain spaces, are not URLs
+      // or Google-internal tokens).
+      const raw = cleaned.match(/"([^"\\]{25,}(?:\\.[^"\\]*)*)"/g) || [];
+      const texts = raw
+        .map((s) => {
+          try { return JSON.parse(s); } catch { return null; }
+        })
+        .filter(
+          (t) =>
+            typeof t === "string" &&
+            /\s/.test(t) &&
+            !t.startsWith("http") &&
+            !t.startsWith("boq_") &&
+            !t.startsWith("data:") &&
+            !/^[A-Za-z0-9+/=_-]{40,}$/.test(t),
         );
-        ws.addEventListener("message", (e) => {
-          const d = e.data;
-          const preview = typeof d === "string" ? d.slice(0, 140) : `[${typeof d} ${d?.byteLength ?? d?.size ?? "?"}B]`;
-          console.log("%c[helix diag]%c WS msg: %s", "color:#f59e0b;font-weight:bold", "color:inherit", preview);
-        });
-        return ws;
-      }
-      HelixWS.prototype = OriginalWS.prototype;
-      HelixWS.CONNECTING = OriginalWS.CONNECTING;
-      HelixWS.OPEN = OriginalWS.OPEN;
-      HelixWS.CLOSING = OriginalWS.CLOSING;
-      HelixWS.CLOSED = OriginalWS.CLOSED;
-      window.WebSocket = HelixWS;
-    } catch (e) {
-      console.warn("[helix diag] WS override failed:", e);
-    }
-
-    // --- EventSource ---
-    try {
-      const OriginalES = window.EventSource;
-      if (OriginalES) {
-        function HelixES(url, cfg) {
-          const es = cfg !== undefined ? new OriginalES(url, cfg) : new OriginalES(url);
-          console.log(
-            "%c[helix diag]%c EventSource opened %s",
-            "color:#f59e0b;font-weight:bold",
-            "color:inherit",
-            String(url).slice(0, 140),
-          );
-          es.addEventListener("message", (e) => {
-            console.log(
-              "%c[helix diag]%c ES msg: %s",
-              "color:#f59e0b;font-weight:bold",
-              "color:inherit",
-              String(e.data || "").slice(0, 140),
-            );
-          });
-          return es;
-        }
-        HelixES.prototype = OriginalES.prototype;
-        HelixES.CONNECTING = OriginalES.CONNECTING;
-        HelixES.OPEN = OriginalES.OPEN;
-        HelixES.CLOSED = OriginalES.CLOSED;
-        window.EventSource = HelixES;
-      }
-    } catch (e) {
-      console.warn("[helix diag] ES override failed:", e);
+      return texts.join("\n");
+    } catch {
+      return "";
     }
   }
 
   // Visible in the page console at default log level.
-  console.log("%c[helix]%c page-hook installed on " + location.host, "color:#06b6d4;font-weight:bold", "color:inherit");
+  console.log(
+    "%c[helix]%c page-hook installed on " + location.host,
+    "color:#06b6d4;font-weight:bold",
+    "color:inherit",
+  );
 })();
