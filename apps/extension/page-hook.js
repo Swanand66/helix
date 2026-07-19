@@ -313,6 +313,25 @@
 
   const BARD_BATCHEXECUTE = "/_/BardChatUi/data/batchexecute";
   const MIN_CHAT_BODY_BYTES = 500; // filter out ping/telemetry ops
+  // "Send message and get response" RPC ids. Anything not in this list
+  // (conversation list, history load, title generation, telemetry, etc.)
+  // uses the same batchexecute URL but with a different rpcids param, and
+  // MUST be skipped so refreshing a chat doesn't re-count old tokens.
+  // If Google renames the send-message RPC, add its new id here.
+  const GEMINI_CHAT_RPCIDS = ["ESY5D", "SNlM0e"];
+  // Guard against tracking the same logical send twice (Gemini sometimes
+  // retries or emits a follow-up call).
+  const DEDUP_WINDOW_MS = 1500;
+  let lastGeminiTrackMs = 0;
+
+  function isGeminiChatSendUrl(url) {
+    if (!url.includes(BARD_BATCHEXECUTE)) return false;
+    // rpcids can be a single id or a comma-separated list.
+    const m = url.match(/[?&]rpcids=([^&]+)/);
+    if (!m) return false;
+    const ids = decodeURIComponent(m[1]).split(",");
+    return ids.some((id) => GEMINI_CHAT_RPCIDS.includes(id));
+  }
 
   if (IS_GEMINI_PAGE) {
     try {
@@ -333,12 +352,15 @@
           state.body = body;
           state.bodyLen = typeof body === "string" ? body.length : 0;
 
+          const now = Date.now();
           const isChatXhr =
             state.method === "POST" &&
-            state.url.includes(BARD_BATCHEXECUTE) &&
-            state.bodyLen >= MIN_CHAT_BODY_BYTES;
+            isGeminiChatSendUrl(state.url) &&
+            state.bodyLen >= MIN_CHAT_BODY_BYTES &&
+            now - lastGeminiTrackMs > DEDUP_WINDOW_MS;
 
           if (isChatXhr) {
+            lastGeminiTrackMs = now;
             const model = detectGeminiModel();
             window.postMessage(
               { type: "HELIX_STREAM", event: "start", source: "gemini", model },
