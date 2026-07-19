@@ -1,6 +1,6 @@
 # Helix
 
-**A live token + cost meter for ChatGPT and Claude.**
+**A live token + cost meter for ChatGPT, Claude, and Gemini.**
 Install the browser extension, chat like normal, and see exactly how much every message is costing you. Local-only, no accounts, no cloud.
 
 <p align="center">
@@ -11,7 +11,7 @@ Install the browser extension, chat like normal, and see exactly how much every 
 
 ## What you get
 
-- **A quiet ⌘ orb** in the bottom-right of chatgpt.com and claude.ai
+- **A quiet ⌘ orb** in the bottom-right of chatgpt.com, claude.ai, gemini.google.com, and aistudio.google.com
 - **Neon glow flows** around it while the assistant is streaming your reply
 - **Click it** to see today's + this month's token usage broken down by model
 - **Daily-refreshed pricing** — providers update rates, you get them within 24h with no re-install

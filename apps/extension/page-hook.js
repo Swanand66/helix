@@ -21,6 +21,14 @@
   // decides whether it's a real chat request.
   const CLAUDE_URL_BROAD = /^https:\/\/claude\.ai\/api\//;
   const CLAUDE_CHAT_HINT = /(completion|append_message|messages|chat_conversation)/i;
+  // Gemini. Two surfaces:
+  //   • gemini.google.com — consumer app, uses BardFrontendService (obscure
+  //     batchexecute RPC format). We still catch these POSTs but response
+  //     parsing is limited; token counts are estimates from URL/body only.
+  //   • aistudio.google.com + generativelanguage.googleapis.com — cleaner
+  //     REST + streamGenerateContent JSON. Full parsing works there.
+  const GEMINI_URL_BROAD = /^https:\/\/(gemini\.google\.com|aistudio\.google\.com|generativelanguage\.googleapis\.com)\//;
+  const GEMINI_CHAT_HINT = /(generateContent|streamGenerateContent|assistant\.lamda|BardChatUi|BardFrontendService|StreamGenerate)/i;
 
   const originalFetch = window.fetch.bind(window);
 
@@ -40,8 +48,9 @@
 
     const isChatGPT = CHATGPT_URL.test(url);
     const isClaudeReq = CLAUDE_URL_BROAD.test(url);
+    const isGeminiReq = GEMINI_URL_BROAD.test(url);
 
-    if (method !== "POST" || (!isChatGPT && !isClaudeReq)) {
+    if (method !== "POST" || (!isChatGPT && !isClaudeReq && !isGeminiReq)) {
       return originalFetch(input, init);
     }
 
@@ -69,8 +78,29 @@
       isClaude = urlLooksLikeChat && bodyLooksLikeChat;
     }
 
+    // For Gemini: two flavors of payload. AI Studio + REST API use standard
+    //   { contents: [{ role, parts: [{ text }] }], model, ... }.
+    // The consumer Gemini app uses a batchexecute POST with form-encoded body
+    // that we can't easily JSON.parse — for those we accept the URL hint alone
+    // and let response parsing best-effort fill in what it can.
+    let isGemini = false;
+    if (isGeminiReq) {
+      const urlLooksLikeChat = GEMINI_CHAT_HINT.test(url);
+      const bodyLooksLikeChat = !!(
+        reqBody && (
+          Array.isArray(reqBody.contents) ||
+          Array.isArray(reqBody.messages) ||
+          typeof reqBody.prompt === "string"
+        )
+      );
+      // gemini.google.com posts form-encoded blobs that JSON.parse can't read;
+      // accept URL match alone for that host.
+      const isConsumerApp = url.includes("gemini.google.com");
+      isGemini = urlLooksLikeChat && (bodyLooksLikeChat || isConsumerApp);
+    }
+
     // If we decided this isn't a chat request, let it pass through untouched.
-    if (!isChatGPT && !isClaude) {
+    if (!isChatGPT && !isClaude && !isGemini) {
       return originalFetch(input, init);
     }
 
@@ -84,7 +114,7 @@
     // Only handle streaming bodies (chat completions are all SSE).
     if (!res.body || !res.body.tee) return res;
 
-    const source = isChatGPT ? "chatgpt" : "claude";
+    const source = isChatGPT ? "chatgpt" : isClaude ? "claude" : "gemini";
     const model = extractModel(source, reqBody);
 
     // Tell the orb a chat is starting — it will glow live from here.
@@ -187,6 +217,20 @@
           else if (evt?.delta?.type === "text_delta" && typeof evt?.delta?.text === "string") out += evt.delta.text;
           else if (evt?.type === "text_delta" && typeof evt?.text === "string") out += evt.text;
           else if (evt?.type === "content_block_delta" && typeof evt?.delta?.text === "string") out += evt.delta.text;
+        } else if (source === "gemini") {
+          // AI Studio / REST API: standard shape.
+          //   { candidates: [{ content: { parts: [{ text: "..." }] } }] }
+          const cands = evt?.candidates;
+          if (Array.isArray(cands)) {
+            for (const c of cands) {
+              const parts = c?.content?.parts;
+              if (Array.isArray(parts)) {
+                for (const p of parts) if (typeof p?.text === "string") out += p.text;
+              }
+            }
+          }
+          // Streaming delta variant.
+          if (typeof evt?.text === "string") out += evt.text;
         }
       } catch {
         // Ignore malformed events.
@@ -196,8 +240,11 @@
   }
 
   function extractModel(source, body) {
-    if (!body) return "unknown";
+    if (!body) return source === "gemini" ? "gemini-2.5-pro" : "unknown";
     if (typeof body.model === "string") return body.model;
+    // Gemini REST puts the model in the URL, not the body — caller fills it
+    // in from the URL when body.model is absent. Give a sensible default.
+    if (source === "gemini") return "gemini-2.5-pro";
     return "unknown";
   }
 
@@ -230,6 +277,24 @@
           return [];
         })
         .join("\n");
+    }
+    if (source === "gemini") {
+      // AI Studio / REST: { contents: [{ role, parts: [{ text }] }] }
+      if (Array.isArray(body.contents)) {
+        return body.contents
+          .flatMap((c) => Array.isArray(c?.parts) ? c.parts : [])
+          .map((p) => (typeof p?.text === "string" ? p.text : ""))
+          .filter(Boolean)
+          .join("\n");
+      }
+      // Simpler variant: { prompt: "..." }
+      if (typeof body.prompt === "string") return body.prompt;
+      // Loose fallback: { messages: [...] }
+      if (Array.isArray(body.messages)) {
+        return body.messages
+          .flatMap((m) => (typeof m?.content === "string" ? [m.content] : []))
+          .join("\n");
+      }
     }
     return "";
   }

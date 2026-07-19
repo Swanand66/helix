@@ -21,9 +21,10 @@
   // ---------------------------------------------------------------------------
 
   const SOURCE =
-    location.host.includes("chatgpt.com") ? "chatgpt" :
-    location.host.includes("claude.ai")   ? "claude"  :
-    location.host.includes("gemini.google.com") ? "gemini" :
+    location.host.includes("chatgpt.com")          ? "chatgpt" :
+    location.host.includes("claude.ai")            ? "claude"  :
+    location.host.includes("gemini.google.com")    ? "gemini"  :
+    location.host.includes("aistudio.google.com")  ? "gemini"  :
     null;
   if (!SOURCE) return;
 
@@ -256,6 +257,9 @@
     gemini: [
       'div[contenteditable="true"].ql-editor',
       'rich-textarea div[contenteditable="true"]',
+      'ms-autosize-textarea textarea',
+      'ms-prompt-input textarea',
+      'textarea[aria-label]',
       'textarea',
     ],
   };

@@ -22,7 +22,7 @@ Helix — LLM token & cost meter
 
 ### Summary (max 132 chars)
 ```
-See exactly how many tokens and dollars you're spending on ChatGPT and Claude, live. Local-only, no accounts, no cloud.
+See how many tokens + dollars you're spending on ChatGPT, Claude & Gemini, live. Local-only, no accounts, no cloud.
 ```
 
 ### Category
@@ -48,6 +48,7 @@ Every measurement happens locally in your browser. Helix never sends your prompt
 WHAT IT TRACKS
   • ChatGPT (GPT-5, GPT-4o, GPT-4o mini, o3, o4, o4-mini)
   • Claude (Claude 5 Opus / Sonnet / Haiku, Claude 4.5 Opus / Sonnet / Haiku)
+  • Gemini (2.5 Pro / Flash — via gemini.google.com and aistudio.google.com)
   • More via daily price refresh
 
 HOW IT WORKS
@@ -86,8 +87,8 @@ The store review team asks you to justify each permission. Copy these into the c
 **`alarms`** —
 > Schedules a once-per-24-hour refresh of the pricing table from a public GitHub JSON URL. This keeps the cost math current without shipping extension updates.
 
-**Host permission for `https://chatgpt.com/*` and `https://claude.ai/*`** —
-> Required to observe chat completion API requests on these two sites and count tokens as the assistant streams its reply. No data from these pages is sent anywhere.
+**Host permission for `https://chatgpt.com/*`, `https://claude.ai/*`, `https://gemini.google.com/*`, `https://aistudio.google.com/*`** —
+> Required to observe chat completion API requests on these four sites and count tokens as the assistant streams its reply. No data from these pages is sent anywhere.
 
 **Host permission for `https://raw.githubusercontent.com/*`** —
 > Required to fetch the daily-updated pricing table (a single JSON file at raw.githubusercontent.com/Swanand66/helix_price/main/prices.json). No user data is uploaded — only the file is downloaded.
