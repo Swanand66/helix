@@ -107,14 +107,6 @@ node scripts/package.mjs
 # and reload it after any code change.
 ```
 
-## Roadmap
-
-- [x] v0.1 — Extension for ChatGPT + Claude with in-page glowing ⌘ orb
-- [x] v0.1 — Daily auto-refresh of pricing via GitHub Action
-- [ ] v0.2 — Gemini + Perplexity + Copilot Chat support
-- [ ] v0.3 — Optional Tauri desktop app for "always visible" outside the browser
-- [ ] v1.0 — Budget alerts, per-project tags, exportable history
-
 ## Privacy
 
 Nothing leaves your browser besides the daily price-file fetch. See [`PRIVACY.md`](PRIVACY.md) for details.
