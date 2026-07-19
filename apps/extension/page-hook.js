@@ -97,6 +97,29 @@
       // accept URL match alone for that host.
       const isConsumerApp = url.includes("gemini.google.com");
       isGemini = urlLooksLikeChat && (bodyLooksLikeChat || isConsumerApp);
+
+      // TEMP diagnostic — every gemini POST is logged so we can see what URLs
+      // and payload shapes their web app actually uses. Remove once tracking
+      // works reliably on gemini.google.com.
+      let bodyPreview = "";
+      try {
+        const raw = init?.body;
+        if (typeof raw === "string") bodyPreview = raw.slice(0, 160);
+        else if (raw instanceof FormData) bodyPreview = "[FormData]";
+        else if (raw instanceof URLSearchParams) bodyPreview = raw.toString().slice(0, 160);
+        else if (raw instanceof ArrayBuffer) bodyPreview = `[ArrayBuffer ${raw.byteLength}B]`;
+        else if (raw) bodyPreview = String(raw).slice(0, 160);
+      } catch { bodyPreview = "?"; }
+      console.log(
+        "%c[helix]%c gemini POST %s | urlHint=%s bodyKeys=%o bodyPreview=%s -> tracking=%s",
+        "color:#06b6d4;font-weight:bold",
+        "color:inherit",
+        url.replace(/^https:\/\/[^/]+/, ""),
+        urlLooksLikeChat,
+        reqBody ? Object.keys(reqBody) : null,
+        bodyPreview,
+        isGemini,
+      );
     }
 
     // If we decided this isn't a chat request, let it pass through untouched.
@@ -137,12 +160,24 @@
     const decoder = new TextDecoder();
     let buffer = "";
     let outText = "";
+    let firstChunkLogged = false;
 
     try {
       while (true) {
         const { value, done } = await reader.read();
         if (done) break;
         buffer += decoder.decode(value, { stream: true });
+
+        // TEMP: log first chunk for gemini so we can see what to parse.
+        if (source === "gemini" && !firstChunkLogged) {
+          firstChunkLogged = true;
+          console.log(
+            "%c[helix]%c gemini first response chunk (first 220 chars):\n%s",
+            "color:#06b6d4;font-weight:bold",
+            "color:inherit",
+            buffer.slice(0, 220),
+          );
+        }
 
         // Parse whole SSE events; keep the trailing partial for next chunk.
         const events = buffer.split("\n\n");
