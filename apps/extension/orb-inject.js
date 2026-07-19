@@ -708,11 +708,20 @@
       return `${(g / 1000).toFixed(2)} kg`;
     }
 
+    function escHtml(s) {
+      return String(s ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#39;");
+    }
+
     function renderRows(el, rows) {
       if (rows.length === 0) { el.innerHTML = ""; return; }
       el.innerHTML = rows
         .map((r) =>
-          `<div class="row"><span>${r.model}</span><span class="tok">${fmtNum(r.tokens)} tok</span><span class="cost">${fmtUsd(r.cost)}</span></div>`)
+          `<div class="row"><span>${escHtml(r.model)}</span><span class="tok">${fmtNum(r.tokens)} tok</span><span class="cost">${escHtml(fmtUsd(r.cost))}</span></div>`)
         .join("");
     }
 

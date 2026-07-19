@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Helix — LLM token meter",
-  "version": "0.4.7",
-  "description": "See exactly how many tokens and dollars you're spending on ChatGPT and Claude, live. Local-only, no accounts.",
+  "version": "0.4.8",
+  "description": "Live token + cost meter for ChatGPT, Claude, and Gemini. Shows spend in real time. Local-only, no accounts, no cloud.",
   "icons": {
     "16":  "icons/icon-16.png",
     "48":  "icons/icon-48.png",

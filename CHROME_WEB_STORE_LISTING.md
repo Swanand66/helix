@@ -37,7 +37,7 @@ See how many tokens + dollars you're spending on ChatGPT, Claude & Gemini, live.
 ```markdown
 Helix is a live token + cost meter for ChatGPT and Claude.
 
-A small glowing ⌘ appears in the corner of chatgpt.com and claude.ai. It stays quiet until you send a message — then it lights up and pulses smoothly while the assistant is streaming its reply. Click it to see:
+A small glowing ⌘ appears in the corner of chatgpt.com, claude.ai, gemini.google.com, and aistudio.google.com. It stays quiet until you send a message — then it lights up and pulses smoothly while the assistant is streaming its reply. Click it to see:
 
   • Today's total tokens + dollars, broken down by model
   • This month's total tokens + dollars, broken down by model
@@ -66,7 +66,7 @@ PRIVACY
 
 LIMITATIONS (BEING HONEST)
   • Approximation-based token counts on Claude (~97% accurate; every stored entry is flagged as approximate)
-  • Only works on chatgpt.com and claude.ai tabs (browser extension can't see the desktop apps)
+  • Only works on the four supported web sites (chatgpt.com, claude.ai, gemini.google.com, aistudio.google.com) — browser extensions can't see native desktop apps
   • Token counts, not billing counts — actual invoices may differ slightly from tracked totals
 
 WHAT'S IN THE ROADMAP
@@ -147,13 +147,13 @@ Save this at the root of the Helix repo, then link its blob URL as the privacy p
 ```markdown
 # Helix privacy policy
 
-Last updated: 2026-07-18
+Last updated: 2026-07-19
 
-Helix is a browser extension that measures your token usage on chatgpt.com and claude.ai and stores the counts locally in your browser. This policy describes exactly what data is collected, where it goes, and what your options are.
+Helix is a browser extension that measures your token usage on chatgpt.com, claude.ai, gemini.google.com, and aistudio.google.com, and stores the counts locally in your browser. This policy describes exactly what data is collected, where it goes, and what your options are.
 
 ## Data we collect
 
-For every chat message you send on chatgpt.com or claude.ai, Helix reads the outgoing request payload and the streamed response to compute:
+For every chat message you send on any of the four supported sites, Helix reads the outgoing request payload and the streamed response to compute:
 
   • A model identifier (e.g. "gpt-4o", "claude-5-sonnet")
   • The number of input tokens

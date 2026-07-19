@@ -1,12 +1,12 @@
 # Helix — privacy policy
 
-_Last updated: 2026-07-18_
+_Last updated: 2026-07-19_
 
-Helix is a browser extension that measures your token usage on chatgpt.com and claude.ai and stores the counts locally in your browser. This document describes exactly what data is collected, where it goes, and what your options are.
+Helix is a browser extension that measures your token usage on chatgpt.com, claude.ai, gemini.google.com, and aistudio.google.com, and stores the counts locally in your browser. This document describes exactly what data is collected, where it goes, and what your options are.
 
 ## What we collect
 
-For every chat message you send on chatgpt.com or claude.ai, Helix reads the outgoing request payload and the streamed response to compute:
+For every chat message you send on any of the four supported sites (chatgpt.com, claude.ai, gemini.google.com, aistudio.google.com), Helix reads the outgoing request payload and the streamed response to compute:
 
 - A model identifier (e.g. `gpt-4o`, `claude-5-sonnet`)
 - The number of input tokens

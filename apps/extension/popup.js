@@ -3,6 +3,19 @@
 
 const STORAGE_KEY = "helix.events";
 
+// Minimal HTML entity escape — used anywhere we interpolate storage-derived
+// data (like a model id) into innerHTML. Providers always return safe
+// strings today, but this defends against future surprises and satisfies
+// reviewer code scans.
+function esc(s) {
+  return String(s ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
 function fmtUsd(n) {
   if (n === 0) return "$0";
   if (n < 0.0001) return `$${n.toFixed(6)}`;
@@ -56,12 +69,13 @@ function renderSection(label, agg) {
   if (agg.count === 0) return "";
   const rows = agg.rows
     .map((r) => {
+      const model = esc(r.model);
       const costCell = r.unpriced
-        ? `<span title="No price for ${r.model} yet">—</span>`
-        : fmtUsd(r.cost);
+        ? `<span title="No price for ${model} yet">—</span>`
+        : esc(fmtUsd(r.cost));
       return `
         <tr>
-          <td class="model">${r.model}${r.unpriced ? ' <span class="warn" title="Unknown price">⚠</span>' : ""}</td>
+          <td class="model">${model}${r.unpriced ? ' <span class="warn" title="Unknown price">⚠</span>' : ""}</td>
           <td class="tokens">${fmtNum(r.tokens)} tok</td>
           <td class="cost">${costCell}</td>
         </tr>`;
@@ -91,7 +105,8 @@ async function render() {
     root.innerHTML = `
       <div class="empty">
         <strong>No usage tracked yet</strong>
-        Open <code>chatgpt.com</code> or <code>claude.ai</code>,<br />
+        Open <code>chatgpt.com</code>, <code>claude.ai</code>,
+        <code>gemini.google.com</code>, or <code>aistudio.google.com</code>,<br />
         send a message, then reopen this popup.
       </div>
     `;
@@ -113,5 +128,11 @@ document.getElementById("reset").addEventListener("click", async () => {
   await chrome.storage.local.remove(STORAGE_KEY);
   render();
 });
+
+// Show the real extension version in the footer instead of hard-coding it.
+try {
+  const v = chrome.runtime.getManifest?.().version;
+  if (v) document.getElementById("version").textContent = "v" + v;
+} catch { /* ignore */ }
 
 render();
