@@ -11,3 +11,8 @@ coverage
 .tsbuildinfo
 scripts/package.json
 scripts/package-lock.json
+
+# Raw screenshot uploads (personal chat history / folder names visible).
+# Only the resized, store-approved ones in screenshots/*-1280x800.png are
+# safe to publish.
+apps/extension/icons/Shot_*.png
